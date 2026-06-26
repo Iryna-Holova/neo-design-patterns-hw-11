@@ -16,12 +16,52 @@ const handlerMap = {
 };
 
 async function main() {
-  // зчитування даних
-  // створення mediator
-  // цикл по records:
-  //   - вибір handler-а через handlerMap
-  //   - try/catch: handle + mediator.onSuccess/onRejected
-  // finalize
+  const data = await fs.readFile('src/data/records.json', 'utf-8');
+  const records: DataRecord[] = JSON.parse(data);
+
+  const accessLogWriter = new AccessLogWriter();
+  const transactionWriter = new TransactionWriter();
+  const errorLogWriter = new ErrorLogWriter();
+  const rejectedWriter = new RejectedWriter();
+  const mediator = new ProcessingMediator(
+    accessLogWriter,
+    transactionWriter,
+    errorLogWriter,
+    rejectedWriter,
+  );
+
+  let successCount = 0;
+  let rejectedCount = 0;
+
+  for (const record of records) {
+    const handlerBuilder = handlerMap[record.type];
+    if (!handlerBuilder) {
+      mediator.onRejected(
+        record,
+        `No handler found for record type: ${record.type}`,
+      );
+      rejectedCount++;
+      continue;
+    }
+
+    const handler = handlerBuilder();
+
+    try {
+      const processed = handler.handle(record);
+      mediator.onSuccess(processed);
+      successCount++;
+    } catch (error) {
+      mediator.onRejected(record, (error as Error).message);
+      rejectedCount++;
+    }
+  }
+
+  await mediator.finalize();
+
+  console.log(`[INFO] Завантажено записів: ${records.length}`);
+  console.log(`[INFO] Успішно оброблено: ${successCount}`);
+  console.log(`[WARN] Відхилено з помилками: ${rejectedCount}`);
+  console.log(`[INFO] Звіт збережено у директорії src/output/`);
 }
 
 main();

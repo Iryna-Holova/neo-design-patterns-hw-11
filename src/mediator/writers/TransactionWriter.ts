@@ -4,9 +4,10 @@ import * as fs from 'fs/promises';
 export class TransactionWriter {
   private lines: string[] = ['timestamp,amount,currency'];
   write(record: TransactionRecord) {
-    // TODO
+    const line = `${record.timestamp},${record.amount},${record.currency}`;
+    this.lines.push(line);
   }
   async finalize() {
-    // TODO
+    await fs.writeFile('src/output/transactions.csv', this.lines.join('\n'));
   }
 }
